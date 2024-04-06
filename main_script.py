@@ -136,24 +136,21 @@ for i in l_outliers_z:
 #OPTION 3: replace with upper_bound values > upper_bound or 
 #with lower_bound values < lower_bound
 #NOTE: This should be applied to the SAME cultivars, for one season/ both seasons!!!!
+
+
+list_non_outliers = []
+for ref in l_outliers:
+    ref_cultivar_name = cultivars_db.loc[ref[0], "Cultivar"]
+    temp_non_outliers = []
+    for row_label, row in cultivars_db.iterrows():
+        if row_label != ref[0] and row.iloc[1] == ref_cultivar_name: #exlude the record of the outlier
+            temp_non_outliers.append(row_label)
+    list_non_outliers.append(temp_non_outliers) #list_values always has 7 values!
     
 #for l_outliers[0]
 #season 1 => mean value = 2.753; median value = 2.550
 #season 2 => mean value = 2.2375; median value = 2.135
 #both seasons => mean_value = 2.458; median value = 2.44
-ref = l_outliers[2]
-list_values = []
-ref_cultivar_name = cultivars_db.loc[ref[0], "Cultivar"]
-for row_label, row in cultivars_db.iterrows():
-    if row_label != ref[0] and row.iloc[1] == ref_cultivar_name: #exlude the record of the outlier
-        list_values.append(row_label) #list_values always has 7 values!
-       #for column_label, value in row.items():
-        #    print(row_label, column_label)
-        
-print("Cultivar | Season | Value")
-print(f"{cultivars_db.loc[ref[0], 'Cultivar']} | {cultivars_db.loc[ref[0], 'Season']} | {cultivars_db.loc[ref[0], ref[1]]} (OUTLIER)")
-for i in list_values:
-    print(f"{cultivars_db.loc[i, 'Cultivar']} | {cultivars_db.loc[i, 'Season']} | {cultivars_db.loc[i, ref[1]]}")
 
 #for l_outliers[1]
 #season 1 => mean value = 222.533; median value = 220.865
@@ -163,11 +160,21 @@ for i in list_values:
 #for l_outliers[2]
 #season 1 => mean value = 2.563; median value = 2.615
 #season 2 => mean value = 3.603; median value = 2.21
-#both seasons => mean_value = 3.009; median value = 2.56
+#both seasons => mean_value = 3.009; median value = 2.56        
+
+idx = 1
+ref = l_outliers[idx]
+print("Cultivar | Season | Value")
+print(f"{cultivars_db.loc[ref[0], 'Cultivar']} | {cultivars_db.loc[ref[0], 'Season']} | {cultivars_db.loc[ref[0], ref[1]]} (OUTLIER)")
+for i in list_non_outliers[idx]:
+    print(f"{cultivars_db.loc[i, 'Cultivar']} | {cultivars_db.loc[i, 'Season']} | {cultivars_db.loc[i, ref[1]]}")
+
 
 #SOLUTION: MEDIAN VALUE, FOR EACH SEASON!
 #median value because values vary greatly in the same season
 #for each season because values tend to vary greatly between seasons
+
+
 
 #print(cultivars_db.head())
 print(cultivars_db.describe())
