@@ -32,9 +32,9 @@ import math
 cultivars_db = pd.read_csv('data/data.csv')
 print(cultivars_db.shape)
 print(cultivars_db.describe())
-verification1 = cultivars_db.describe()
+statistic1 = cultivars_db.describe()
 
-#PART 1: PREPROCESSING DATA (name verification of cultivars between files was done in part 2)
+#PART 1: PREPROCESSING DATA (name verification of cultivars between files & min-max scaling were done in part 2)
 
 # Step 1: Checking for missing values
 missing_values = cultivars_db.isna().sum()
@@ -179,7 +179,7 @@ for i in list_non_outliers[idx]:
 #median value because values vary greatly in the same season
 #for each season because values tend to vary greatly between seasons
 
-#normalized values
+#normalized values (wihtout outliers)
 outliers_norm_values = []
 for outlier_idx in range(0, len(l_outliers)):
     temp_list = []
@@ -202,17 +202,30 @@ for outlier_idx in range(0, len(l_outliers)):
 for outlier_idx in range(0, len(l_outliers)):
     ref = l_outliers[outlier_idx]
     cultivars_db.loc[ref[0], ref[1]] = outliers_norm_values[outlier_idx]
-
-
-#writing dataframe to csv
-cultivars_db.to_csv('data/data_normalized.csv', index=False)
+    
+#writing dataframe to csv (file without outliers, without scaling)
+cultivars_db.to_csv('data/data_noOutliers.csv', index=False)
 
 #analyzing results
-cultivars_db = pd.read_csv('data/data_normalized.csv')
-print(cultivars_db.describe())
-verification2 = cultivars_db.describe()
+cultivars_db = pd.read_csv('data/data_noOutliers.csv')
+#print(cultivars_db.describe())
+statistic2 = cultivars_db.describe()
 
-#fanelus = cultivars_db.to_numpy()
+
+#Step 4: Min-max feature scaling (we've removed outliers & we want to preserve the original distribution)
+numeric_columns = cultivars_db.select_dtypes(include=['float64', 'int64'])
+numeric_columns_minMax = (numeric_columns - numeric_columns.min()) / (numeric_columns.max() - numeric_columns.min())
+cultivars_db_minMax = cultivars_db
+
+for column in numeric_columns_minMax:
+    cultivars_db_minMax[column] = numeric_columns_minMax[column]
+
+#writing dataframe to csv (file without outliers, with min-max scaling)
+cultivars_db_minMax.to_csv('data/data_normalized.csv', index=False)
+
+#analyzing results
+cultivars_db_minMax = pd.read_csv('data/data_normalized.csv')
+statistic3 = cultivars_db_minMax.describe()
 
 #==============================================================================
 #==============================================================================
@@ -221,6 +234,7 @@ verification2 = cultivars_db.describe()
 #==============================================================================
 #==============================================================================
 #PART 2: ANALYZING DATA
+#PART 2.1: CORRELATION COEFFICIENTS
 #in cultivars-description.ods, we can see that for every record, the following formula applies:
 #density = seeds *20000
 #with the exception of LAT 1330BT.11 and LTT 7901 IPRO (aprox seeds * 19000)
@@ -248,6 +262,7 @@ plt.show()
 
 #FILE 2: data_normalized.csv
 cultivars_df = pd.read_csv('data/data_normalized.csv')
+#cultivars_df = pd.read_csv('data/data_normalized.csv')
 numeric_columns = cultivars_df.select_dtypes(include=['float64', 'int64'])
 
 correlation_matrix = numeric_columns.corr()
@@ -265,14 +280,14 @@ plt.title('Cross-Correlation Matrix')
 plt.show()
 
 #1) we observe a moderate negative correlation(-0.506) between NS (number of stems) and season number
-#2) we observe a strong positive correlation (0.824) between NGP (number of grains per plant) and NLP (number of legumes per plant)
+#2) we observe a strong positive correlation (0.825) between NGP (number of grains per plant) and NLP (number of legumes per plant)
 #-> normal result, because every plant contains multiples legumes, while every legume contains multipe grains (NGP > NLP always)
 #3) we have moderate positive correlation (0.522) between NS (number of stems) and NLP (number of legumes per plant)
 #4) we have moderate positive correlation (0.517) between NS (number of stems) and NGP (number of grains per plant))
-#NOTE: normal result, considering the fact that NLP and NGP are stronglt correlated
+#NOTE: normal result, considering the fact that NLP and NGP are strongly correlated
 #5) we have moderate negative correlation (-0.506) between NS and season number
 #6) we have relatively weak correlation (0.308) between MHG and season number
-#7) next, we have a very weak negative correlation (-0.130) between MHG and NS
+#7) next, we have a very weak negative correlation (-0.129) between MHG and NS
 #8) we have relatively weak positive correlation (0.260) between GY and NGP
 #9) we have a weak correlation positive correlation (0.199) between GY and NLP
 
@@ -316,10 +331,21 @@ for row_label, row in cultivars_df.iterrows():
             l_density.append(j.iloc[3])
     #print(row_label, row)
 
+#min-max normalizing values from cultivars-description
+def minMax_scaling(data):
+    minimum = min(data)
+    maximum = max(data)
+    minMax_data = [(n - minimum) / (maximum - minimum) for n in data]
+    return minMax_data
+
+l_maturation_scaled = minMax_scaling(l_maturation)
+l_seed_scaled = minMax_scaling(l_seed)
+l_density_scaled = minMax_scaling(l_density)
+
 #writing new columns to dataframe
-cultivars_df['Maturation group'] = l_maturation
-cultivars_df['Seeds per meter/linear'] = l_seed
-cultivars_df['Density per meter/linear'] = l_density
+cultivars_df['Maturation group'] = l_maturation_scaled
+cultivars_df['Seeds per meter/linear'] = l_seed_scaled
+cultivars_df['Density per meter/linear'] = l_density_scaled
 
 #writing unified dataframe to new file
 cultivars_df.to_csv('data/data_unified.csv', index=False)
@@ -342,12 +368,30 @@ plt.figure(figsize=(10, 8))
 sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
 plt.title('Cross-Correlation Matrix')
 plt.show()
-#1) we have relatively weak correlation (0.381) between GY and maaturation group
+#1) we have relatively weak correlation (0.382) between GY and maaturation group
 #2) we have relatively weak negative correlation (-0.240) between GY and seeds per meter (and density)
 #3) we have a very weak positive correlation (0.183) between MHG and seeds per meter
 
 #STRONGEST CORRELATION FOR MHG AND GY:
-#1) MHG -> Season number (0.308); Seeds per meter (0.183); NS (-0.130)
-#2) GY -> Maturation group (0.381); NGP (0.260); Seeds per meter (-0.240); 
+#1) MHG -> Season number (0.308); Seeds per meter (0.183); NS (-0.129)
+#2) GY -> Maturation group (0.382); NGP (0.260); Seeds per meter (-0.240); 
+
+#PART 2.2: MULTIPLE REGRESSION
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
