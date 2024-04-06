@@ -30,6 +30,10 @@ import math
 #GY = Grain yield
 cultivars_db = pd.read_csv('data/data.csv')
 print(cultivars_db.shape)
+print(cultivars_db.describe())
+verification1 = cultivars_db.describe()
+
+#PART 1: PREPROCESSING DATA
 
 # Step 1: Checking for missing values
 missing_values = cultivars_db.isna().sum()
@@ -162,7 +166,7 @@ for ref in l_outliers:
 #season 2 => mean value = 3.603; median value = 2.21
 #both seasons => mean_value = 3.009; median value = 2.56        
 
-idx = 1
+idx = 2
 ref = l_outliers[idx]
 print("Cultivar | Season | Value")
 print(f"{cultivars_db.loc[ref[0], 'Cultivar']} | {cultivars_db.loc[ref[0], 'Season']} | {cultivars_db.loc[ref[0], ref[1]]} (OUTLIER)")
@@ -174,10 +178,39 @@ for i in list_non_outliers[idx]:
 #median value because values vary greatly in the same season
 #for each season because values tend to vary greatly between seasons
 
+#normalized values
+outliers_norm_values = []
+for outlier_idx in range(0, len(l_outliers)):
+    temp_list = []
+    ref = l_outliers[outlier_idx][0]
+    for i in list_non_outliers[outlier_idx]:
+        if i > ref - 4 and i < ref + 4: #cultivars are grouped 4 by 4
+            temp_list.append(i) #each time it will have 3 elements
+            #print(i)
+    
+    values_list = []
+    ref_label = l_outliers[outlier_idx][1]
+    for i in temp_list:
+        values_list.append(cultivars_db.loc[i, ref_label])
+    #print(values_list)
+    values_list.sort()
+    #print(values_list)
+    outliers_norm_values.append(values_list[1]) #median value = element with index 1
+        
+#replacing outliers with normalized values
+for outlier_idx in range(0, len(l_outliers)):
+    ref = l_outliers[outlier_idx]
+    cultivars_db.loc[ref[0], ref[1]] = outliers_norm_values[outlier_idx]
 
 
-#print(cultivars_db.head())
+#writing dataframe to csv
+cultivars_db.to_csv('data/data_normalized.csv', index=False)
+
+#analyzing results
+cultivars_db = pd.read_csv('data/data_normalized.csv')
 print(cultivars_db.describe())
+verification2 = cultivars_db.describe()
+
 #fanelus = cultivars_db.to_numpy()
 
 
