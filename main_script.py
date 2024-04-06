@@ -13,6 +13,11 @@ import matplotlib.pyplot as plt
 from scipy.stats import kurtosis, skew
 import math
 
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import RandomForestRegressor
+
 #40 soybean cultivars * 4 replications * 2 seasons = 320 samples
 #first sowing - 11 Nov 2022 (? 2023 in article)
 #second sowing - 02 Dec 2022 (? 2023 in article)
@@ -376,7 +381,116 @@ plt.show()
 #1) MHG -> Season number (0.308); Seeds per meter (0.183); NS (-0.129)
 #2) GY -> Maturation group (0.382); NGP (0.260); Seeds per meter (-0.240); 
 
-#PART 2.2: MULTIPLE REGRESSION
+
+#PART 2.2: MULTIPLE LINEAR REGRESSION
+cultivars_df = pd.read_csv('data/data_unified.csv')
+
+#PART 2.2.1 - MHG (std = 0.221)
+#data preparation - split the data into training and testing sets
+#NOTE: having highly correlated predictor variables adds redundancy to the model.
+x = cultivars_df.drop(['MHG', 'Cultivar', 'Density per meter/linear', 'NGP'], axis = 1) 
+#MHG is removed becaused it is the target feature
+#Cultivar is removed because it contains only strings
+#Density was removed because it is strongly correlated to Seeds (>0.99)
+#NGP was removed because it is strongly correlated to NLP (0.825)
+y = cultivars_df['MHG']  #target feature
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+#selecting regression model
+model = LinearRegression()
+
+#training the regression model
+model.fit(x_train, y_train)
+
+#evaluating the model
+y_pred = model.predict(x_test)
+mse = mean_squared_error(y_test, y_pred)
+print("Mean Squared Error: ", mse)
+
+#printing the results
+coefficients = pd.DataFrame({'Feature': x.columns, 'Coefficient': model.coef_})
+
+#mse = 0.0443
+#MAIN COEFF: PH(-0.283), GY (0.265), Seeds per meter (0.179), Season number (0.170)
+
+#WE NEED TO TAKE INTO ACCOUNT BOTH ANALYSIS!!!!
+
+#PART 2.2.2 - GY (std = 0.149)
+#data preparation - split the data into training and testing sets
+x = cultivars_df.drop(['GY', 'Cultivar', 'Density per meter/linear', 'NGP'], axis = 1) 
+#GY is removed becaused it is the target feature
+#Cultivar is removed because it contains only strings
+#Density was removed because it is strongly correlated to Seeds (>0.99)
+#NGP was removed because it is strongly correlated to NLP (0.825)
+y = cultivars_df['GY']  #target feature
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+#selecting regression model
+model = LinearRegression()
+
+#training the regression model
+model.fit(x_train, y_train)
+
+#evaluating the model
+y_pred = model.predict(x_test)
+mse = mean_squared_error(y_test, y_pred)
+print("Mean Squared Error: ", mse)
+
+#printing the results
+coefficients = pd.DataFrame({'Feature': x.columns, 'Coefficient': model.coef_})
+
+#mse = 0.0180
+#MAIN COEFF: Maturation Group (0.306), NS (0.200), MHG (-0.111), IFP (0.084)
+
+#PART 2.3 Randomm Forest
+cultivars_df = pd.read_csv('data/data_unified.csv')
+
+#PART 2.3.1 - MHG (std = 0.221)
+x = cultivars_df.drop(['MHG', 'Cultivar', 'Density per meter/linear', 'NGP'], axis = 1) 
+y = cultivars_df['MHG']
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+model = RandomForestRegressor(random_state=42)
+
+model.fit(x_train, y_train)
+
+y_pred = model.predict(x_test)
+mse = mean_squared_error(y_test, y_pred)
+print("Mean Squared Error: ", mse) 
+
+#printing feaeture importances
+importances = model.feature_importances_
+feature_importance_df = pd.DataFrame({'Feature': x_train.columns, 'Importance': importances})
+feature_importance_df = feature_importance_df.sort_values(by='Importance', ascending=False)
+
+#mse = 0.0132
+#MAIN FEATURES: Maturation Group (0.238), GY (0.208), Seeds (0.134), PH (0.091)
+
+#PART 2.3.2 - GY (std = 0.149)
+x = cultivars_df.drop(['GY', 'Cultivar', 'Density per meter/linear', 'NGP'], axis = 1) 
+y = cultivars_df['GY']
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+model = RandomForestRegressor(random_state=42)
+
+model.fit(x_train, y_train)
+
+y_pred = model.predict(x_test)
+mse = mean_squared_error(y_test, y_pred)
+print("Mean Squared Error: ", mse) 
+
+#printing feaeture importances
+importances = model.feature_importances_
+feature_importance_df = pd.DataFrame({'Feature': x_train.columns, 'Importance': importances})
+feature_importance_df = feature_importance_df.sort_values(by='Importance', ascending=False)
+
+#mse = 0.0132
+#MAIN FEATURES: MHG (0.200), Maturation Group (0.197), NS (0.144), Seeds (0.110)
+
 
 
 
