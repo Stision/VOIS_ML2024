@@ -6,6 +6,7 @@ Created on Fri Apr  5 15:25:11 2024
 """
 
 import pandas as pd
+#import pandas.io.formats.odf
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -33,7 +34,7 @@ print(cultivars_db.shape)
 print(cultivars_db.describe())
 verification1 = cultivars_db.describe()
 
-#PART 1: PREPROCESSING DATA
+#PART 1: PREPROCESSING DATA (name verification of cultivars between files was done in part 2)
 
 # Step 1: Checking for missing values
 missing_values = cultivars_db.isna().sum()
@@ -213,11 +214,43 @@ verification2 = cultivars_db.describe()
 
 #fanelus = cultivars_db.to_numpy()
 
+#==============================================================================
+#==============================================================================
+#==============================================================================
+#==============================================================================
+#==============================================================================
+#==============================================================================
+#PART 2: ANALYZING DATA
+#in cultivars-description.ods, we can see that for every record, the following formula applies:
+#density = seeds *20000
+#with the exception of LAT 1330BT.11 and LTT 7901 IPRO (aprox seeds * 19000)
 
+#FILE 1: cultivars-description.ods
+description_df = pd.read_excel('data/cultivars-description.ods', engine = 'odf')
+numeric_columns = description_df.select_dtypes(include=['float64', 'int64'])
 
-cultivarsDB_simple = cultivars_db.iloc[:,3:]
+correlation_matrix = numeric_columns.corr()
+s = correlation_matrix.unstack()
+max_s = max(s[s != 1])
+print(max_s)
+min_s = min(s)
+print(min_s)
 
-correlation_matrix = cultivarsDB_simple.corr()
+plt.figure(figsize=(10, 8))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+plt.title('Cross-Correlation Matrix')
+plt.show()
+
+#1) formula from above demonstrated by the correlation matrix => we can use either the seed column
+#or the density column (using both will be redundant) => we choose seeds column
+#2) we observe a strong negative correlation (-0.601) between the maturation group and seed column
+#which can be further used in analyzing the data
+
+#FILE 2: data_normalized.csv
+cultivars_df = pd.read_csv('data/data_normalized.csv')
+numeric_columns = cultivars_df.select_dtypes(include=['float64', 'int64'])
+
+correlation_matrix = numeric_columns.corr()
 s = correlation_matrix.unstack()
 max_s = max(s[s != 1])
 print(max_s)
@@ -231,4 +264,90 @@ sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
 plt.title('Cross-Correlation Matrix')
 plt.show()
 
-#print(fanelus[2, 3])
+#1) we observe a moderate negative correlation(-0.506) between NS (number of stems) and season number
+#2) we observe a strong positive correlation (0.824) between NGP (number of grains per plant) and NLP (number of legumes per plant)
+#-> normal result, because every plant contains multiples legumes, while every legume contains multipe grains (NGP > NLP always)
+#3) we have moderate positive correlation (0.522) between NS (number of stems) and NLP (number of legumes per plant)
+#4) we have moderate positive correlation (0.517) between NS (number of stems) and NGP (number of grains per plant))
+#NOTE: normal result, considering the fact that NLP and NGP are stronglt correlated
+#5) we have moderate negative correlation (-0.506) between NS and season number
+#6) we have relatively weak correlation (0.308) between MHG and season number
+#7) next, we have a very weak negative correlation (-0.130) between MHG and NS
+#8) we have relatively weak positive correlation (0.260) between GY and NGP
+#9) we have a weak correlation positive correlation (0.199) between GY and NLP
+
+
+#Creation data_unified.csv - contains both data_normalized.csv and cultivars-description.ods
+cultivars_df = pd.read_csv('data/data_normalized.csv')
+description_df = pd.read_excel('data/cultivars-description.ods', engine = 'odf')
+
+#first we verify if all the names from cultivars-description.ods are written as in data_normalized.csv
+name_status = []
+for i, j in description_df.iterrows():
+    flag = False
+    for row_label, row in cultivars_df.iterrows():
+        if j.iloc[0] == row.iloc[1]:
+            flag = True
+            break
+    name_status.append((j.iloc[0], flag))
+    if not flag:
+        print(j.iloc[0])
+    #print(i, j)
+#NAMES NOT IDENTIFIED: M 8606I2X, BRASMAX OLÍMPO IPRO, LAT 1330BT.11, GNS7900IPRO - AMPLA, GNS7700IPRO
+#CORRECT REPRESENTATION IN FILES (cultivars-description -> data_normalized):
+#1) M 8606I2X -> MONSOY M8606I2X
+#2) BRASMAX OLÍMPO IPRO -> BRASMAX OLIMPO IPRO
+#3) LAT 1330BT.11 -> LAT 1330BT
+#4) GNS7900IPRO - AMPLA -> GNS7900 IPRO - AMPLA
+#5) GNS7700IPRO -> GNS7700 IPRO
+
+#Rewritting new .ods file with corrected name => cultivars-description_corrected.ods
+description_df = pd.read_excel('data/cultivars-description_corrected.ods', engine = 'odf')
+
+l_maturation = []
+l_seed = []
+l_density = []
+
+for row_label, row in cultivars_df.iterrows():
+    for i, j in description_df.iterrows():
+        if j.iloc[0] == row.iloc[1]:
+            l_maturation.append(j.iloc[1])
+            l_seed.append(j.iloc[2])
+            l_density.append(j.iloc[3])
+    #print(row_label, row)
+
+#writing new columns to dataframe
+cultivars_df['Maturation group'] = l_maturation
+cultivars_df['Seeds per meter/linear'] = l_seed
+cultivars_df['Density per meter/linear'] = l_density
+
+#writing unified dataframe to new file
+cultivars_df.to_csv('data/data_unified.csv', index=False)
+
+
+#FILE 3: data_unified.csv
+cultivars_unified_df = pd.read_csv('data/data_unified.csv')
+numeric_columns = cultivars_unified_df.select_dtypes(include=['float64', 'int64'])
+
+correlation_matrix = numeric_columns.corr()
+s = correlation_matrix.unstack()
+max_s = max(s[s != 1])
+print(max_s)
+min_s = min(s)
+print(min_s)
+#print(max(correlation_matrix))
+#print(s.iloc[5])
+
+plt.figure(figsize=(10, 8))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+plt.title('Cross-Correlation Matrix')
+plt.show()
+#1) we have relatively weak correlation (0.381) between GY and maaturation group
+#2) we have relatively weak negative correlation (-0.240) between GY and seeds per meter (and density)
+#3) we have a very weak positive correlation (0.183) between MHG and seeds per meter
+
+#STRONGEST CORRELATION FOR MHG AND GY:
+#1) MHG -> Season number (0.308); Seeds per meter (0.183); NS (-0.130)
+#2) GY -> Maturation group (0.381); NGP (0.260); Seeds per meter (-0.240); 
+
+
