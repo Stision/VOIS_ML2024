@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import kurtosis, skew
 import math
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold, cross_val_score
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
@@ -427,6 +427,8 @@ plt.show()
 
 #PART 2.2: MULTIPLE LINEAR REGRESSION
 cultivars_df = pd.read_csv('data/data_unified.csv')
+kf = KFold(n_splits=5, shuffle=True, random_state=42) #kfold cross-validation
+cv_list = []
 
 #PART 2.2.1 - MHG (std = 0.221)
 #data preparation - split the data into training and testing sets
@@ -442,6 +444,20 @@ x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_
 
 #selecting regression model
 model = LinearRegression()
+
+#applying kfold cross-validation
+cv_scores = cross_val_score(model, x_train, y_train, cv=kf, scoring='neg_mean_squared_error')
+#cv_scores = cross_val_score(model, x_train, y_train, cv=kf, scoring='r2')
+cv_scores = -cv_scores
+
+print("Cross-validation MSE scores:", cv_scores)
+print("Mean MSE:", cv_scores.mean()) #consistent scores
+
+dict_cv = {f'Split {i+1}': score for i, score in enumerate(cv_scores)}
+dict_cv['Mean'] = np.mean(cv_scores)
+dict_cv['Name'] = 'Linear Regression - MHG'
+cv_list.append(dict_cv)
+#cultivar_cv_scores = pd.DataFrame(cv_list)
 
 #training the regression model
 model.fit(x_train, y_train)
@@ -473,6 +489,20 @@ x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_
 #selecting regression model
 model = LinearRegression()
 
+#applying kfold cross-validation
+cv_scores = cross_val_score(model, x_train, y_train, cv=kf, scoring='neg_mean_squared_error')
+#cv_scores = cross_val_score(model, x_train, y_train, cv=kf, scoring='r2')
+cv_scores = -cv_scores
+
+print("Cross-validation MSE scores:", cv_scores)
+print("Mean MSE:", cv_scores.mean()) #consistent scores
+
+dict_cv = {f'Split {i+1}': score for i, score in enumerate(cv_scores)}
+dict_cv['Mean'] = np.mean(cv_scores)
+dict_cv['Name'] = 'Linear Regression - GY'
+cv_list.append(dict_cv)
+#cultivar_cv_scores = pd.DataFrame(cv_list)
+
 #training the regression model
 model.fit(x_train, y_train)
 
@@ -498,6 +528,17 @@ x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_
 
 model = RandomForestRegressor(random_state=42)
 
+cv_scores = cross_val_score(model, x_train, y_train, cv=kf, scoring='neg_mean_squared_error')
+cv_scores = -cv_scores
+
+print("Cross-validation MSE scores:", cv_scores)
+print("Mean MSE:", cv_scores.mean()) #consistent scores
+
+dict_cv = {f'Split {i+1}': score for i, score in enumerate(cv_scores)}
+dict_cv['Mean'] = np.mean(cv_scores)
+dict_cv['Name'] = 'Random Forest - MHG'
+cv_list.append(dict_cv)
+
 model.fit(x_train, y_train)
 
 y_pred = model.predict(x_test)
@@ -520,6 +561,17 @@ x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_
 
 model = RandomForestRegressor(random_state=42)
 
+cv_scores = cross_val_score(model, x_train, y_train, cv=kf, scoring='neg_mean_squared_error')
+cv_scores = -cv_scores
+
+print("Cross-validation MSE scores:", cv_scores)
+print("Mean MSE:", cv_scores.mean()) #consistent scores
+
+dict_cv = {f'Split {i+1}': score for i, score in enumerate(cv_scores)}
+dict_cv['Mean'] = np.mean(cv_scores)
+dict_cv['Name'] = 'Random Forest - GY'
+cv_list.append(dict_cv)
+
 model.fit(x_train, y_train)
 
 y_pred = model.predict(x_test)
@@ -533,14 +585,10 @@ feature_importance_df = feature_importance_df.sort_values(by='Importance', ascen
 
 #mse = 0.0132
 #MAIN FEATURES: MHG (0.200), Maturation Group (0.197), NS (0.144), Seeds (0.110)
-
+cultivar_cv_scores = pd.DataFrame(cv_list)
 
 #PART 2.4 Permutation Analysis
-
-
-
-
-
+fanel = list(cv_scores)
 
 
 
