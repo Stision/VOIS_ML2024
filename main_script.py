@@ -14,9 +14,11 @@ from scipy.stats import kurtosis, skew
 import math
 
 from sklearn.model_selection import train_test_split, KFold, cross_val_score
+from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.cluster import KMeans
 
 #40 soybean cultivars * 4 replications * 2 seasons = 320 samples
 #first sowing - 11 Nov 2022 (? 2023 in article)
@@ -429,6 +431,13 @@ plt.show()
 cultivars_df = pd.read_csv('data/data_unified.csv')
 kf = KFold(n_splits=5, shuffle=True, random_state=42) #kfold cross-validation
 cv_list = []
+perm_list = []
+#Analysis (for both MGH and GY):
+#1) Coefficients from Multiple Regression
+#2) MSE from Multiple Regression and Random Forest Regressor
+#3) Gini Importance for Random Forest Regressor
+#4) Permutation Feature Importance for both Multiple Regression and Random Forest Regressor
+#5) Cross-validation for both Multiple Regression and Random Forest Regressor
 
 #PART 2.2.1 - MHG (std = 0.221)
 #data preparation - split the data into training and testing sets
@@ -461,6 +470,12 @@ cv_list.append(dict_cv)
 
 #training the regression model
 model.fit(x_train, y_train)
+
+#computing permutation feature importance
+perm_importance = permutation_importance(model, x_train, y_train, n_repeats=10, random_state=42)
+dict_perm = dict(zip(x_train.columns, perm_importance['importances_mean']))
+dict_perm['Name'] = 'Linear Regression - MHG'
+perm_list.append(dict_perm)
 
 #evaluating the model
 y_pred = model.predict(x_test)
@@ -506,6 +521,12 @@ cv_list.append(dict_cv)
 #training the regression model
 model.fit(x_train, y_train)
 
+#computing permutation feature importance
+perm_importance = permutation_importance(model, x_train, y_train, n_repeats=10, random_state=42)
+dict_perm = dict(zip(x_train.columns, perm_importance['importances_mean']))
+dict_perm['Name'] = 'Linear Regression - GY'
+perm_list.append(dict_perm)
+
 #evaluating the model
 y_pred = model.predict(x_test)
 mse = mean_squared_error(y_test, y_pred)
@@ -541,12 +562,17 @@ cv_list.append(dict_cv)
 
 model.fit(x_train, y_train)
 
+perm_importance = permutation_importance(model, x_train, y_train, n_repeats=10, random_state=42)
+dict_perm = dict(zip(x_train.columns, perm_importance['importances_mean']))
+dict_perm['Name'] = 'Random Forest - MHG'
+perm_list.append(dict_perm)
+
 y_pred = model.predict(x_test)
 mse = mean_squared_error(y_test, y_pred)
 print("Mean Squared Error: ", mse) 
 
 #printing feaeture importances
-importances = model.feature_importances_
+importances = model.feature_importances_ #Gini feature importance
 feature_importance_df = pd.DataFrame({'Feature': x_train.columns, 'Importance': importances})
 feature_importance_df = feature_importance_df.sort_values(by='Importance', ascending=False)
 
@@ -574,21 +600,112 @@ cv_list.append(dict_cv)
 
 model.fit(x_train, y_train)
 
+perm_importance = permutation_importance(model, x_train, y_train, n_repeats=10, random_state=42)
+dict_perm = dict(zip(x_train.columns, perm_importance['importances_mean']))
+dict_perm['Name'] = 'Random Forest - GY'
+perm_list.append(dict_perm)
+
 y_pred = model.predict(x_test)
 mse = mean_squared_error(y_test, y_pred)
 print("Mean Squared Error: ", mse) 
 
 #printing feaeture importances
-importances = model.feature_importances_
+importances = model.feature_importances_ #Gini feature importance
 feature_importance_df = pd.DataFrame({'Feature': x_train.columns, 'Importance': importances})
 feature_importance_df = feature_importance_df.sort_values(by='Importance', ascending=False)
 
 #mse = 0.0132
 #MAIN FEATURES: MHG (0.200), Maturation Group (0.197), NS (0.144), Seeds (0.110)
 cultivar_cv_scores = pd.DataFrame(cv_list)
+cultivar_perm_importance = pd.DataFrame(perm_list)
 
-#PART 2.4 Permutation Analysis
-fanel = list(cv_scores)
+
+#PART 3: New Cultivar Generation. MHG prediction (ex 15 - 18)
+
+#PART 3.1: Creating new synthetic cultivar (MHG also generated)
+cultivars_df = pd.read_csv('data/data_unified.csv')
+cultivar_df_season1 = cultivars_df.iloc[:160, 1:]
+cultivar_df_season2 = cultivars_df.iloc[160:, 1:]
+
+buffer_season1 = []
+buffer_season2 = []
+for _, group in cultivars_df.iloc[:160, 2:].groupby('Repetition'):
+    buffer_season1.append(group)
+for _, group in cultivars_df.iloc[160:, 2:].groupby('Repetition'):
+    buffer_season2.append(group)
+
+data = {'Season': [0]*4 + [1]*4, 'Cultivar': ['VOIS_ML2024']*8}
+new_cultivar_ls1 = []
+new_cultivar_ls2 = []
+for temp in buffer_season1:
+    mean_value = temp.mean().to_dict()
+    new_cultivar_ls1.append(mean_value)
+for temp in buffer_season2:
+    mean_value = temp.mean().to_dict()
+    new_cultivar_ls2.append(mean_value)
+fanel = new_cultivar_ls1 + new_cultivar_ls2
+new_cultivar_df = pd.concat([pd.DataFrame(data), pd.DataFrame(new_cultivar_ls1 + new_cultivar_ls2)], axis = 1)
+
+new_cultivar_df.to_csv('data/new_cultivar.csv', index=False)
+
+#PART 3.2: Verifying new cultivar using clusters (k-means)
+#NOTE: a new file was created, including all the previous cultivars and the new one - data_full.csv 
+full_cultivar_df = pd.read_csv('data/data_full.csv')
+#x = full_cultivar_df.drop(['Cultivar', 'Density per meter/linear', 'NGP'], axis = 1) 
+x = full_cultivar_df.drop(['Cultivar', 'Density per meter/linear', 'NGP', 'Season', 'Repetition'], axis = 1) 
+#Repetion and season removed because the cluster seems to "respect" only those 2 variables 
+#EX: Cluster 0 = season 1 + repetition 0.67 OR 1
+#EX: Cluster 1 = season 0 + repetition 0 OR 0.333
+#EX: Cluster 2 = season 0 + repetition 0.67 OR 1
+#EX: Cluster 3 = season 1 + repetition 0 OR 0.33
+
+k_values = range(1, 15)
+wcss = [] #list to store the within-cluster sum of squares
+for k in k_values:
+    model = KMeans(n_clusters=k)
+    model.fit(x)
+    wcss.append(model.inertia_)
+    
+# Plot the Elbow Curve
+plt.plot(k_values, wcss, marker='o')
+plt.title('Elbow Method for Optimal K')
+plt.xlabel('Number of Clusters (K)')
+plt.ylabel('Within-Cluster Sum of Squares (WCSS)')
+plt.show()
+
+model = KMeans(n_clusters = 4) #k_optimum = 4 or 10
+model.fit(x)
+#results good for 4
+
+clusters = model.predict(x)
+full_cultivar_df['Cluster'] = clusters
+
+grouped_fc_df = full_cultivar_df.groupby('Cluster')
+combined_fc_df = pd.concat([group for _, group in grouped_fc_df])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
