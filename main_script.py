@@ -39,7 +39,7 @@ print(cultivars_db.shape)
 print(cultivars_db.describe())
 statistic1 = cultivars_db.describe()
 
-#PART 1: PREPROCESSING DATA (name verification of cultivars between files & min-max scaling were done in part 2)
+#PART 1: PREPROCESSING DATA (name verification of cultivars names between files was done in part 2)
 
 # Step 1: Checking for missing values
 missing_values = cultivars_db.isna().sum()
@@ -232,13 +232,56 @@ cultivars_db_minMax.to_csv('data/data_normalized.csv', index=False)
 cultivars_db_minMax = pd.read_csv('data/data_normalized.csv')
 statistic3 = cultivars_db_minMax.describe()
 
+
+#==============================================================================
+#==============================================================================
+#==============================================================================
+#EXTRA: Exercise 13
+cultivars_db = pd.read_csv('data/data_noOutliers.csv')
+
+#CASE 1: FOR ALL THE CULTIVARS
+MHG_Season1 = cultivars_db.loc[cultivars_db['Season'] == 1, 'MHG']
+MHG_Season2 = cultivars_db.loc[cultivars_db['Season'] == 2, 'MHG']
+delta_MHG = MHG_Season2.mean() - MHG_Season1.mean() #12.067 => increase
+
+GY_Season1 = cultivars_db.loc[cultivars_db['Season'] == 1, 'GY']
+GY_Season2 = cultivars_db.loc[cultivars_db['Season'] == 2, 'GY']
+delta_GY = GY_Season2.mean() - GY_Season1.mean() #-19.797 => decrease
+
+#CASE 2: FOR THE SAME CULTIVARS
+#sort = False keeps the same order from cultivars_db
+cultivar_grouped = cultivars_db.groupby('Cultivar', sort = False)
+#cultivar_grouped.first()
+#cultivar_grouped.get_group('NEO 760 CE')
+
+delta_list = []
+for group_name, group_data in cultivar_grouped:
+    #print("Group:", group_name)
+    #print(group_data)
+    MHG_Season1_temp = group_data.loc[group_data['Season'] == 1, 'MHG'].mean()
+    MHG_Season2_temp = group_data.loc[group_data['Season'] == 2, 'MHG'].mean()
+    MHG_delta = MHG_Season2_temp - MHG_Season1_temp
+    
+    GY_Season1_temp = group_data.loc[group_data['Season'] == 1, 'GY'].mean()
+    GY_Season2_temp = group_data.loc[group_data['Season'] == 2, 'GY'].mean()
+    GY_delta = GY_Season2_temp - GY_Season1_temp
+    
+    dict_delta = {'Cultivar Name': group_name, 'Delta MHG': MHG_delta, 'Delta GY': GY_delta}
+    delta_list.append(dict_delta)
+
+cultivar_delta = pd.DataFrame(delta_list)
+#cultivar_delta.loc[:,'Delta MHG'].mean()#verification1: 12.067
+#cultivar_delta.loc[:,'Delta GY'].mean()#verification2: -19.797
+print(cultivar_delta)
+
+
 #==============================================================================
 #==============================================================================
 #==============================================================================
 #==============================================================================
 #==============================================================================
 #==============================================================================
-#PART 2: ANALYZING DATA
+#PART 2: ANALYZING DATA (ex 10 - 12; 14)
 #PART 2.1: CORRELATION COEFFICIENTS
 #in cultivars-description.ods, we can see that for every record, the following formula applies:
 #density = seeds *20000
@@ -492,7 +535,7 @@ feature_importance_df = feature_importance_df.sort_values(by='Importance', ascen
 #MAIN FEATURES: MHG (0.200), Maturation Group (0.197), NS (0.144), Seeds (0.110)
 
 
-
+#PART 2.4 Permutation Analysis
 
 
 
