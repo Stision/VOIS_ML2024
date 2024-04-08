@@ -17,8 +17,9 @@ from sklearn.model_selection import train_test_split, KFold, cross_val_score
 from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.cluster import KMeans
+from sklearn.model_selection import GridSearchCV
 
 #40 soybean cultivars * 4 replications * 2 seasons = 320 samples
 #first sowing - 11 Nov 2022 (? 2023 in article)
@@ -678,25 +679,149 @@ model.fit(x)
 #results good for 4
 
 clusters = model.predict(x)
+_, label_counts = np.unique(clusters, return_counts=True)
+
 full_cultivar_df['Cluster'] = clusters
 
 grouped_fc_df = full_cultivar_df.groupby('Cluster')
 combined_fc_df = pd.concat([group for _, group in grouped_fc_df])
 
+#models lists: multiple regression (unoptimized), decision tree (unoptimized), 
+#kmeans (4 clusters), kmeans (10 clusters - mayber)
+#random forest (optimized), Gradient Boosting Machine (maybe)
 
 
 
+#PART 3.3: MHG prediction for new cultivar
+#PART 3.3.1: RANDOM FOREST REGRESSOR - ALL FEATURES (NON-REDUNDANT/ STRING)
+cultivars_df = pd.read_csv('data/data_unified.csv')
+statistic = cultivars_df.describe()
+
+x = cultivars_df.drop(['MHG', 'Cultivar', 'Density per meter/linear', 'NGP'], axis = 1) 
+y = cultivars_df['MHG']
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+model = RandomForestRegressor(random_state=42)
+
+model.fit(x_train, y_train)
+
+y_pred = model.predict(x_test)
+
+mse = mean_squared_error(y_test, y_pred)
+print("Mean Squared Error:", mse)#0.013
+
+initial_params = model.get_params()
+print("Initial Hyperparameters:")
+print("n_estimators:", initial_params['n_estimators']) #100
+print("max_depth:", initial_params['max_depth']) #None
+print("min_samples_split:", initial_params['min_samples_split']) #2
+print("min_samples_leaf:", initial_params['min_samples_leaf']) #1
+
+#Optimizing model
+hyperParam_list = {
+    'n_estimators': [100, 200, 300],  # Number of trees in the forest
+    'max_depth': [None, 10, 20],       # Maximum depth of the tree
+    'min_samples_split': [2, 5, 10],    # Minimum number of samples required to split a node
+    'min_samples_leaf': [1, 2, 4]       # Minimum number of samples required at each leaf node
+}
+
+grid_search = GridSearchCV(estimator=RandomForestRegressor(random_state=42),
+                           param_grid=hyperParam_list,
+                           scoring='neg_mean_squared_error',
+                           cv=5,  # 5-fold cross-validation, as in data analysis part
+                           verbose=1,
+                           n_jobs=-1)  # Use all available CPU cores
+
+#perform grid search
+grid_search.fit(x_train, y_train)
+
+#best parameters found using grid search
+print("Best Parameters:", grid_search.best_params_)
+
+#best model found
+best_model = grid_search.best_estimator_
+
+y_pred = best_model.predict(x_test)
+
+mse = mean_squared_error(y_test, y_pred)
+print("Mean Squared Error:", mse)#0.013
+
+#predicting MHG for new cultivar and compairing with actual results
+new_cultivar_df = pd.read_csv('data/new_cultivar.csv')
+statistic = new_cultivar_df.describe()
+x_new_test = new_cultivar_df.drop(['MHG', 'Cultivar', 'Density per meter/linear', 'NGP'], axis = 1) 
+y_new_test = new_cultivar_df['MHG']
+
+y_new_pred = best_model.predict(x_new_test)
+
+mse = mean_squared_error(y_new_test, y_new_pred)
+print("Mean Squared Error:", mse)#0.029
+
+#PART 3.3.2: RANDOM FOREST REGRESSOR - Determinant Features (3 or 5???)
+#----------------------------------------------------------------------
 
 
+#PART 3.3.3: Gradient Boosting Machine - ALL FEATURES
+cultivars_df = pd.read_csv('data/data_unified.csv')
+statistic = cultivars_df.describe()
+
+x = cultivars_df.drop(['MHG', 'Cultivar', 'Density per meter/linear', 'NGP'], axis = 1) 
+y = cultivars_df['MHG']
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+model = GradientBoostingRegressor(random_state=42)
+
+model.fit(x_train, y_train)
+
+y_pred = model.predict(x_test)
+
+mse = mean_squared_error(y_test, y_pred)
+print("Mean Squared Error:", mse)#0.0135
 
 
+#Optimizing model - 2430 models (5 folds for 486 candidates)
+hyperParam_list = {
+    'n_estimators': [100, 200, 300],  # Number of boosting stages
+    'learning_rate': [0.05, 0.1, 0.2],  # Learning rate
+    'max_depth': [3, 4, 5],  # Maximum depth of the individual regression estimators
+    'min_samples_split': [2, 5, 10],  # Minimum number of samples required to split an internal node
+    'min_samples_leaf': [1, 2, 4],  # Minimum number of samples required to be at a leaf node
+    'subsample': [0.8, 1.0]  # Subsample ratio of the training instances
+}
 
+grid_search = GridSearchCV(estimator=GradientBoostingRegressor(random_state=42),
+                           param_grid=hyperParam_list,
+                           scoring='neg_mean_squared_error',
+                           cv=5,  # 5-fold cross-validation, as in data analysis part
+                           verbose=1,
+                           n_jobs=-1)  # Use all available CPU cores
 
+#perform grid search
+grid_search.fit(x_train, y_train)
 
+#best parameters found using grid search
+print("Best Parameters:", grid_search.best_params_)
 
+#best model found
+best_model = grid_search.best_estimator_
 
+y_pred = best_model.predict(x_test)
 
+mse = mean_squared_error(y_test, y_pred)
+print("Mean Squared Error:", mse)#0.0124
 
+#predicting MHG for new cultivar and compairing with actual results
+new_cultivar_df = pd.read_csv('data/new_cultivar.csv')
+statistic = new_cultivar_df.describe()
+x_new_test = new_cultivar_df.drop(['MHG', 'Cultivar', 'Density per meter/linear', 'NGP'], axis = 1) 
+y_new_test = new_cultivar_df['MHG']
+
+y_new_pred = best_model.predict(x_new_test)
+
+mse = mean_squared_error(y_new_test, y_new_pred)
+print("Mean Squared Error:", mse)#0.0371
 
 
 
