@@ -20,6 +20,9 @@ from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.cluster import KMeans
 from sklearn.model_selection import GridSearchCV
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.pipeline import Pipeline
 
 #40 soybean cultivars * 4 replications * 2 seasons = 320 samples
 #first sowing - 11 Nov 2022 (? 2023 in article)
@@ -348,6 +351,16 @@ cultivars_df = pd.read_csv('data/data_normalized.csv')
 description_df = pd.read_excel('data/cultivars-description.ods', engine = 'odf')
 
 #first we verify if all the names from cultivars-description.ods are written as in data_normalized.csv
+comp1 = cultivars_df['Cultivar']
+comp2 = description_df['Cultivars']
+
+not_found_cultivars = []
+for term in description_df['Cultivars']:
+    if term not in cultivars_df['Cultivar'].values:
+        not_found_cultivars.append(term)
+        
+
+
 name_status = []
 for i, j in description_df.iterrows():
     flag = False
@@ -369,6 +382,18 @@ for i, j in description_df.iterrows():
 
 #Rewritting new .ods file with corrected name => cultivars-description_corrected.ods
 description_df = pd.read_excel('data/cultivars-description_corrected.ods', engine = 'odf')
+
+description_list = []
+
+
+for term_cultivar in cultivars_df['Cultivar']:
+    for term_description in description_df['Cultivars']:
+        if term_description == term_cultivar:
+            temp = description_df[description_df.eq(term_description).any(axis=1)]
+            description_dict = {"Maturation group":temp.iloc[0, 1], "Seeds per meter/linear": temp.iloc[0, 2], "Density per meter/linear": temp.iloc[0, 3]}
+            description_list.append(description_dict)
+            
+            
 
 l_maturation = []
 l_seed = []
@@ -764,6 +789,8 @@ print("Mean Squared Error:", mse)#0.029
 
 #PART 3.3.3: Gradient Boosting Machine - ALL FEATURES
 cultivars_df = pd.read_csv('data/data_unified.csv')
+#one_hot_encoding = pd.get_dummies(cultivars_df['Cultivar'])
+#encoded_data = pd.concat([cultivars_df, one_hot_encoding], axis=1)
 statistic = cultivars_df.describe()
 
 x = cultivars_df.drop(['MHG', 'Cultivar', 'Density per meter/linear', 'NGP'], axis = 1) 
@@ -774,6 +801,9 @@ x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_
 model = GradientBoostingRegressor(random_state=42)
 
 model.fit(x_train, y_train)
+
+score = model.score(x_test, y_test)
+print("R^2 Score:", score)
 
 y_pred = model.predict(x_test)
 
@@ -825,18 +855,85 @@ print("Mean Squared Error:", mse)#0.0371
 
 
 
+#TEST - ONE HOT ENCODER
+cultivars_df = pd.read_csv('data/data_unified.csv')
+statistic = cultivars_df.describe()
+
+#x = cultivars_df.drop(['MHG', 'Density per meter/linear', 'NGP'], axis = 1) 
+x = cultivars_df.drop(['MHG'], axis = 1) 
+y = cultivars_df['MHG']
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+# Define the column transformer to apply one-hot encoding to 'Cultivar' column
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('onehot', OneHotEncoder(), ['Cultivar'])  # Assuming 'Cultivar' is the column containing cultivar names
+    ],
+    remainder='passthrough'  # Keep other numerical features unchanged
+)
 
 
 
+# Define the pipeline with preprocessor and Gradient Boosting Regressor model
+model_pipeline = Pipeline([
+    ('preprocessor', preprocessor),
+    ('regressor', GradientBoostingRegressor())  # You can customize hyperparameters here
+])
+
+transformed_data = model_pipeline.named_steps['preprocessor'].transform(x_train)
+transformed_df = pd.DataFrame(transformed_data)
+
+model_pipeline.fit(x_train, y_train)
+
+score = model_pipeline.score(x_test, y_test)
+print("R^2 Score:", score)
+
+y_pred = model_pipeline.predict(x_test)
+
+mse = mean_squared_error(y_test, y_pred)
+print("Mean Squared Error:", mse)#0.006579875204994996
 
 
 
+#TEST 2
+cultivars_df = pd.read_csv('data/data_unified.csv')
+statistic = cultivars_df.describe()
+
+# Initialize the OneHotEncoder
+one_hot_encoder = OneHotEncoder(sparse=False)
+
+# Fit and transform the 'Cultivar' column
+one_hot_encoded_column = one_hot_encoder.fit_transform(cultivars_df[['Cultivar']])
+
+# Convert the one-hot encoded column into a DataFrame
+one_hot_encoded_df = pd.DataFrame(one_hot_encoded_column, columns=one_hot_encoder.get_feature_names_out(['Cultivar']))
+
+# Concatenate the one-hot encoded DataFrame with the original DataFrame
+df_encoded = pd.concat([cultivars_df.drop(columns=['Cultivar']), one_hot_encoded_df], axis=1)
+
+# Display the DataFrame with one-hot encoding applied
+print(df_encoded)
 
 
+#test 3
+cultivars_unified_df = pd.read_csv('data/data_test.csv')
+#numeric_columns = cultivars_df.drop(['Cultivar'], axis = 1) 
+numeric_columns = cultivars_unified_df[['Maturation group', 'Seeds per meter/linear', 'Test']]
 
+correlation_matrix = numeric_columns.corr()
+s = correlation_matrix.unstack()
+max_s = max(s[s != 1])
+print(max_s)
+min_s = min(s)
+print(min_s)
+#print(max(correlation_matrix))
+#print(s.iloc[5])
 
-
-
+plt.figure(figsize=(10, 8))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+plt.title('Cross-Correlation Matrix')
+plt.show()
 
 
 
