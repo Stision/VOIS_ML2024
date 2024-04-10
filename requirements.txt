@@ -1,0 +1,6 @@
+Necessary libraries:
+1) pandas
+2) NumPy
+3) Seaborn
+4) Matplotlib
+5) scikit-learn
