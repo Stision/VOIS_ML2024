@@ -486,7 +486,7 @@ cv_scores = cross_val_score(model, x_train, y_train, cv=kf, scoring='neg_mean_sq
 cv_scores = -cv_scores
 
 print("Cross-validation MSE scores:", cv_scores)
-print("Mean MSE:", cv_scores.mean()) #consistent scores
+print("Mean MSE (cv):", cv_scores.mean()) #consistent scores
 
 dict_cv = {f'Split {i+1}': score for i, score in enumerate(cv_scores)}
 dict_cv['Mean'] = np.mean(cv_scores)
@@ -672,11 +672,11 @@ for temp in buffer_season2:
 fanel = new_cultivar_ls1 + new_cultivar_ls2
 new_cultivar_df = pd.concat([pd.DataFrame(data), pd.DataFrame(new_cultivar_ls1 + new_cultivar_ls2)], axis = 1)
 
-new_cultivar_df.to_csv('data/new_cultivar.csv', index=False)
+new_cultivar_df.to_csv('data/new_cultivar1.csv', index=False)
 
 #PART 3.2: Verifying new cultivar using clusters (k-means)
 #NOTE: a new file was created, including all the previous cultivars and the new one - data_full.csv 
-full_cultivar_df = pd.read_csv('data/data_full.csv')
+full_cultivar_df = pd.read_csv('data/data_full1.csv')
 #x = full_cultivar_df.drop(['Cultivar', 'Density per meter/linear', 'NGP'], axis = 1) 
 x = full_cultivar_df.drop(['Cultivar', 'Density per meter/linear', 'NGP', 'Season', 'Repetition'], axis = 1) 
 #Repetion and season removed because the cluster seems to "respect" only those 2 variables 
